@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from .analysis import ANALYZER_VERSION, analyze_basic_answer
 from .config import APP_VERSION, Settings
 from .database import Database
-from .services import LocalComponentError, OllamaService, WhisperService
+from .services import LocalComponentError, OllamaService, VoskService
 from .work_gate import WorkBusyError, WorkCancelledError, WorkGate, WorkTimeoutError
 
 
@@ -37,7 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     db = Database(settings.data_dir / "dojo.db")
     db.initialize()
     ollama = OllamaService(settings)
-    whisper = WhisperService(settings)
+    vosk = VoskService(settings)
     work_gate = WorkGate()
 
     app = FastAPI(title="Dojo da Matemática", version=APP_VERSION)
@@ -57,7 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "message": "Livre para foto ou áudio." if not work_gate.busy else "Uma leitura está em andamento.",
             },
             "ollama": await ollama.status(),
-            "whisper": whisper.status(),
+            "vosk": vosk.status(),
         }
 
     @app.post("/api/drafts/text")
@@ -114,7 +114,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         work_dir = Path(tempfile.mkdtemp(prefix="dojo-audio-", dir=temp_dir))
         try:
             reading = await work_gate.run(
-                lambda: whisper.transcribe(path, work_dir),
+                lambda: vosk.transcribe(path, work_dir),
                 timeout_seconds=settings.audio_timeout_seconds,
             )
             if not reading:

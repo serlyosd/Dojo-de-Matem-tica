@@ -14,7 +14,7 @@ if (-not $python -and -not $nextAction) { $nextAction = "Instale o Python 3.12."
 $appPython = Join-Path (Split-Path $PSScriptRoot -Parent) ".venv\Scripts\python.exe"
 $dependenciesReady = $false
 if (Test-Path $appPython -PathType Leaf) {
-    & $appPython -c "import fastapi, httpx, multipart, uvicorn" 2>$null
+    & $appPython -c "import fastapi, httpx, multipart, uvicorn, vosk" 2>$null
     $dependenciesReady = $LASTEXITCODE -eq 0
 }
 Report $dependenciesReady "Aplicativo Python" ".venv e bibliotecas"
@@ -36,15 +36,20 @@ try {
     if (-not $nextAction) { $nextAction = "Abra o Ollama." }
 }
 
-$whisperReady = Test-Path $env:WHISPER_CLI -PathType Leaf
-$whisperModelReady = Test-Path $env:WHISPER_MODEL -PathType Leaf
+$voskModelReady = Test-Path (Join-Path $env:VOSK_MODEL_DIR "conf\model.conf") -PathType Leaf
 $ffmpegReady = Test-Path $env:FFMPEG -PathType Leaf
-Report $whisperReady "Whisper.cpp" $env:WHISPER_CLI
-Report $whisperModelReady "Modelo Whisper" $env:WHISPER_MODEL
+Report $voskModelReady "Modelo Vosk portugues pequeno" $env:VOSK_MODEL_DIR
 Report $ffmpegReady "FFmpeg" $env:FFMPEG
-if (-not $whisperReady -and -not $nextAction) { $nextAction = "Coloque whisper-cli.exe na pasta tools\whisper." }
-if (-not $whisperModelReady -and -not $nextAction) { $nextAction = "Coloque ggml-small.bin na pasta models." }
+if (-not $voskModelReady -and -not $nextAction) { $nextAction = "Execute scripts\preparar_windows.bat para baixar o modelo Vosk." }
 if (-not $ffmpegReady -and -not $nextAction) { $nextAction = "Coloque ffmpeg.exe na pasta tools\ffmpeg\bin." }
+
+$voskRuntimeReady = $false
+if ($dependenciesReady -and $voskModelReady) {
+    & $appPython -c "import os; from vosk import Model,SetLogLevel; SetLogLevel(-1); Model(os.environ['VOSK_MODEL_DIR'])" 2>$null
+    $voskRuntimeReady = $LASTEXITCODE -eq 0
+}
+Report $voskRuntimeReady "Vosk no processador" "modelo carregado neste computador"
+if (-not $voskRuntimeReady -and -not $nextAction) { $nextAction = "Execute scripts\preparar_windows.bat novamente." }
 
 $drive = Get-PSDrive -Name ([System.IO.Path]::GetPathRoot($env:LOCALAPPDATA).Substring(0,1))
 if ($drive) {

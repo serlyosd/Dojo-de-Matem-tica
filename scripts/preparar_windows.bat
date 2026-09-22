@@ -1,6 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0.."
+call "%~dp0configurar_dojo.bat"
 echo [Dojo] Preparando o aplicativo...
 where py >nul 2>nul
 if errorlevel 1 (
@@ -15,8 +16,10 @@ if errorlevel 1 goto :erro
 if errorlevel 1 goto :erro
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 goto :erro
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0baixar_modelo_vosk.ps1"
+if errorlevel 1 goto :erro
 echo.
-echo PRONTO: dependencias do aplicativo instaladas.
+echo PRONTO: aplicativo e modelo Vosk instalados.
 echo Agora execute scripts\verificar_windows.bat.
 pause
 exit /b 0

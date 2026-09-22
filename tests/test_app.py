@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
-from app.services import OllamaService, WhisperService
+from app.services import OllamaService, VoskService
 
 
 def settings(tmp_path):
@@ -15,8 +15,7 @@ def settings(tmp_path):
         data_dir=tmp_path,
         ollama_url="http://ollama.invalid",
         ollama_model="modelo-simulado",
-        whisper_cli="whisper-cli",
-        whisper_model="modelo.bin",
+        vosk_model_dir="modelo-vosk",
         ffmpeg="ffmpeg",
     )
 
@@ -63,7 +62,7 @@ def test_browser_audio_is_passed_to_local_transcriber(tmp_path, monkeypatch):
         assert source.suffix == ".webm"
         return "Eu fiz vinte e quatro dividido por seis."
 
-    monkeypatch.setattr(WhisperService, "transcribe", fake_transcribe)
+    monkeypatch.setattr(VoskService, "transcribe", fake_transcribe)
     with TestClient(create_app(settings(tmp_path))) as client:
         response = client.post(
             "/api/drafts/audio",
@@ -73,6 +72,13 @@ def test_browser_audio_is_passed_to_local_transcriber(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert "vinte e quatro" in response.json()["reading"]
     assert list((tmp_path / "temp").iterdir()) == []
+    with TestClient(create_app(settings(tmp_path))) as client:
+        corrected = client.post(
+            "/api/analyze",
+            json={"draft_id": response.json()["draft_id"], "corrected_text": "24 dividido por 6 é 4"},
+        )
+    assert corrected.status_code == 200
+    assert "quantidade final de 4 veículos está correta" in corrected.json()["analysis"]
 
 
 def test_rejects_unexpected_photo_format(tmp_path):

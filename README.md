@@ -7,7 +7,7 @@ Prova técnica local de um tutor de matemática com identidade de aventura ninja
 - Mostra uma missão matemática curta.
 - Recebe resposta digitada, foto (`JPG`, `PNG` ou `WebP`) ou áudio do navegador.
 - Usa o Qwen3-VL no Ollama **somente** para transcrever a foto.
-- Usa FFmpeg e Whisper.cpp **somente** para converter e transcrever o áudio localmente.
+- Usa FFmpeg e Vosk **somente** para converter e transcrever o áudio localmente.
 - Confere a resposta confirmada com regras Python locais, rápidas e determinísticas.
 - Sempre mostra a leitura da foto ou a transcrição em uma caixa editável.
 - Só faz a conferência local depois que a pessoa confirma essa leitura.
@@ -22,9 +22,11 @@ Prova técnica local de um tutor de matemática com identidade de aventura ninja
 - Respostas digitadas e cálculos simples não iniciam o Ollama.
 - Após a confirmação, respostas de texto, foto e áudio usam a mesma conferência Python.
 - Foto e áudio compartilham uma única vaga de processamento; uma segunda tentativa recebe uma mensagem para aguardar ou cancelar.
-- Foto tem limite padrão de 90 segundos; áudio, 240 segundos.
-- O botão **Cancelar tarefa** encerra a requisição ao Ollama ou o processo local do FFmpeg/Whisper.
+- Foto tem limite padrão de 90 segundos; áudio, 120 segundos.
+- O botão **Cancelar tarefa** encerra a requisição ao Ollama ou o processo local do FFmpeg/Vosk.
 - Arquivos temporários são removidos mesmo em erro, timeout ou cancelamento.
+- O Vosk roda em um processo separado, com uma única thread e áudio limitado a 60 segundos.
+- O modelo padrão é o português pequeno `vosk-model-small-pt-0.3`, adequado à prova em um computador com 4 GB de RAM.
 
 ## Primeiro uso no Windows
 
@@ -35,9 +37,9 @@ Instale:
 1. Python 3.12. Marque a opção que adiciona o Python ao sistema.
 2. Ollama para Windows.
 3. Qwen3-VL no Ollama com o nome `qwen3-vl:4b`.
-4. Whisper.cpp para Windows.
-5. Um modelo **multilíngue** do Whisper.cpp.
-6. FFmpeg para Windows.
+4. FFmpeg para Windows.
+
+O script de preparação instala a biblioteca Vosk e baixa automaticamente o modelo português pequeno. Nenhum transcritor ou modelo adicional é necessário.
 
 Depois de instalar e abrir o Ollama, execute no **Prompt de Comando**:
 
@@ -47,18 +49,16 @@ ollama run qwen3-vl:4b
 
 Espere o download terminar. Digite `/bye` para sair da conversa de teste.
 
-Organize os três últimos itens assim:
+Os arquivos locais ficarão organizados assim:
 
 ```text
 Dojo-de-Matem-tica/
 ├── models/
-│   └── ggml-small.bin
+│   └── vosk-model-small-pt-0.3/
 └── tools/
-    ├── ffmpeg/
-    │   └── bin/
-    │       └── ffmpeg.exe
-    └── whisper/
-        └── whisper-cli.exe
+    └── ffmpeg/
+        └── bin/
+            └── ffmpeg.exe
 ```
 
 Se usar outros locais ou nomes, edite somente `scripts\configurar_dojo.bat`.
@@ -133,14 +133,15 @@ Modelos, banco, fotos e áudios não devem ser enviados ao GitHub. As mídias de
 
 ## Testes simulados para desenvolvimento
 
-Os testes automatizados **não avaliam a qualidade real** do Qwen3-VL, do Whisper.cpp nem do microfone. Eles usam respostas simuladas para verificar:
+Os testes automatizados **não avaliam a qualidade real** do Qwen3-VL, do Vosk nem do microfone. Eles usam respostas simuladas para verificar:
 
 - confirmação e correção antes da análise;
 - armazenamento mínimo no SQLite;
 - remoção de mídia temporária;
 - aceitação do áudio WebM gravado pelo navegador;
 - comando de conversão para WAV mono de 16 kHz;
-- chamada local do Whisper em português;
+- chamada isolada do Vosk com o modelo português pequeno;
+- limite de duração, thread única, timeout e cancelamento;
 - rejeição de formato de foto não permitido.
 
 Para executá-los:
@@ -163,12 +164,12 @@ Variáveis opcionais:
 | --- | --- |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` |
 | `OLLAMA_MODEL` | `qwen3-vl:4b` |
-| `WHISPER_CLI` | `whisper-cli` |
-| `WHISPER_MODEL` | vazio; deve ser configurado |
+| `VOSK_MODEL_DIR` | pasta do modelo `vosk-model-small-pt-0.3` |
 | `FFMPEG` | `ffmpeg` |
 | `DOJO_DATA_DIR` | `%LOCALAPPDATA%\DojoDaMatematica` no Windows; `data/` nos demais sistemas |
 | `PHOTO_TIMEOUT_SECONDS` | `90` |
-| `AUDIO_TIMEOUT_SECONDS` | `240` |
+| `AUDIO_TIMEOUT_SECONDS` | `120` |
+| `MAX_AUDIO_SECONDS` | `60` |
 
 ## Fora do escopo
 

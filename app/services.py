@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import importlib.util
+import os
 import shutil
+import sys
+import wave
 from pathlib import Path
 
 from .config import Settings
@@ -70,7 +74,7 @@ class OllamaService:
         }
 
 
-class WhisperService:
+class VoskService:
     def __init__(self, settings: Settings):
         self.settings = settings
 
@@ -81,31 +85,33 @@ class WhisperService:
         return shutil.which(value)
 
     def status(self) -> dict[str, object]:
-        whisper = self._program(self.settings.whisper_cli)
-        model = Path(self.settings.whisper_model) if self.settings.whisper_model else None
+        model = Path(self.settings.vosk_model_dir) if self.settings.vosk_model_dir else None
         ffmpeg = self._program(self.settings.ffmpeg)
         missing = []
-        if not whisper:
-            missing.append("Whisper.cpp")
-        if not model or not model.is_file():
-            missing.append("modelo multilíngue do Whisper")
+        if importlib.util.find_spec("vosk") is None:
+            missing.append("biblioteca Python Vosk")
+        if not model or not model.is_dir() or not (model / "conf" / "model.conf").is_file():
+            missing.append("modelo português pequeno do Vosk")
         if not ffmpeg:
             missing.append("FFmpeg")
         if missing:
             return {"ready": False, "message": "Falta: " + ", ".join(missing) + "."}
-        return {"ready": True, "message": "Whisper.cpp, modelo e FFmpeg prontos."}
+        return {"ready": True, "message": "Vosk português pequeno e FFmpeg prontos."}
 
-    async def _run(self, command: list[str], timeout: int, failure_message: str) -> None:
+    async def _run(self, command: list[str], timeout: int, failure_message: str) -> bytes:
+        environment = os.environ.copy()
+        environment.update({"OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"})
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=environment,
             )
         except OSError as exc:
             raise LocalComponentError(failure_message) from exc
         try:
-            _, _ = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=timeout)
         except TimeoutError as exc:
             process.kill()
             await process.communicate()
@@ -116,6 +122,14 @@ class WhisperService:
             raise
         if process.returncode != 0:
             raise LocalComponentError(failure_message)
+        return stdout
+
+    def _duration(self, wav_path: Path) -> float:
+        try:
+            with wave.open(str(wav_path), "rb") as audio:
+                return audio.getnframes() / audio.getframerate()
+        except (wave.Error, OSError, ZeroDivisionError) as exc:
+            raise LocalComponentError("O FFmpeg criou um áudio inválido. Grave novamente.") from exc
 
     async def transcribe(self, source: Path, work_dir: Path) -> str:
         status = self.status()
@@ -126,22 +140,29 @@ class WhisperService:
         await self._run(
             [
                 str(self._program(self.settings.ffmpeg)), "-y", "-i", str(source),
+                "-t", str(self.settings.max_audio_seconds + 1), "-threads", "1",
                 "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(wav_path),
             ],
             timeout=min(60, self.settings.audio_timeout_seconds),
             failure_message="Não consegui converter o áudio. Confira o FFmpeg e o formato gravado.",
         )
+        if self._duration(wav_path) > self.settings.max_audio_seconds:
+            raise LocalComponentError(
+                f"O áudio passa de {self.settings.max_audio_seconds} segundos. Grave uma explicação mais curta."
+            )
 
-        output_prefix = work_dir / f"{source.stem}-transcricao"
-        await self._run(
+        stdout = await self._run(
             [
-                str(self._program(self.settings.whisper_cli)), "-m", self.settings.whisper_model,
-                "-f", str(wav_path), "-l", "pt", "-otxt", "-of", str(output_prefix),
+                sys.executable, "-m", "app.vosk_worker",
+                "--model", self.settings.vosk_model_dir,
+                "--audio", str(wav_path),
             ],
             timeout=self.settings.audio_timeout_seconds,
-            failure_message="O Whisper.cpp não conseguiu transcrever o áudio.",
+            failure_message=(
+                "O Vosk não conseguiu transcrever. Confira o modelo português e a compatibilidade do processador."
+            ),
         )
-        transcript_path = output_prefix.with_suffix(".txt")
-        if not transcript_path.is_file():
-            raise LocalComponentError("O Whisper.cpp terminou sem criar a transcrição.")
-        return transcript_path.read_text(encoding="utf-8").strip()
+        try:
+            return stdout.decode("utf-8").strip()
+        except UnicodeDecodeError as exc:
+            raise LocalComponentError("O Vosk devolveu uma transcrição inválida.") from exc
