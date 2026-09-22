@@ -4,7 +4,10 @@ let audioBlob = null;
 let mediaRecorder = null;
 let mediaStream = null;
 
-function busy(active) { $("#busy").hidden = !active; }
+function busy(active, cancellable = false) {
+  $("#busy").hidden = !active;
+  $("#cancel-task").hidden = !active || !cancellable;
+}
 function error(message) {
   const toast = $("#toast");
   toast.textContent = message;
@@ -32,8 +35,8 @@ function actionRequired(message) {
   $("#mic-state").textContent = message;
 }
 
-async function request(url, options = {}) {
-  busy(true);
+async function request(url, options = {}, cancellable = false) {
+  busy(true, cancellable);
   try {
     const response = await fetch(url, options);
     let data;
@@ -88,7 +91,7 @@ $("#send-photo").addEventListener("click", async () => {
   const file = $("#photo-input").files[0];
   if (!file) return;
   const form = new FormData(); form.append("file", file);
-  try { showConfirmation(await request("/api/drafts/photo", { method: "POST", body: form })); }
+  try { showConfirmation(await request("/api/drafts/photo", { method: "POST", body: form }, true)); }
   catch (reason) { error(reason.message); }
 });
 
@@ -148,7 +151,7 @@ $("#send-audio").addEventListener("click", async () => {
   if (!audioBlob) return;
   const extension = audioBlob.type.includes("ogg") ? "ogg" : audioBlob.type.includes("mp4") ? "m4a" : "webm";
   const form = new FormData(); form.append("file", audioBlob, `gravacao.${extension}`);
-  try { showConfirmation(await request("/api/drafts/audio", { method: "POST", body: form })); }
+  try { showConfirmation(await request("/api/drafts/audio", { method: "POST", body: form }, true)); }
   catch (reason) { error(reason.message); }
 });
 
@@ -188,4 +191,19 @@ $("#status-button").addEventListener("click", async () => {
   } catch (reason) { error(reason.message); }
 });
 $("#close-status").addEventListener("click", () => $("#status-dialog").close());
+$("#cancel-task").addEventListener("click", async () => {
+  $("#cancel-task").disabled = true;
+  $("#cancel-task").textContent = "Cancelando…";
+  try {
+    const response = await fetch("/api/tasks/current", { method: "DELETE" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Não consegui cancelar a tarefa.");
+    if (!data.cancelled) error(data.message);
+  } catch (reason) {
+    error(reason.message);
+  } finally {
+    $("#cancel-task").disabled = false;
+    $("#cancel-task").textContent = "Cancelar tarefa";
+  }
+});
 window.addEventListener("beforeunload", () => mediaStream?.getTracks().forEach((track) => track.stop()));

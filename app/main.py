@@ -9,17 +9,14 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from starlette.concurrency import run_in_threadpool
 
+from .analysis import ANALYZER_VERSION, analyze_basic_answer
 from .config import APP_VERSION, Settings
 from .database import Database
 from .services import LocalComponentError, OllamaService, WhisperService
+from .work_gate import WorkBusyError, WorkCancelledError, WorkGate, WorkTimeoutError
 
 
-ACTIVITY = (
-    "Missão do Dojo: a equipe ninja tem 24 peças. Cada veículo precisa de 6 peças. "
-    "Quantos veículos completos a equipe pode montar?"
-)
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -41,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     db.initialize()
     ollama = OllamaService(settings)
     whisper = WhisperService(settings)
+    work_gate = WorkGate()
 
     app = FastAPI(title="Dojo da Matemática", version=APP_VERSION)
     app.mount("/static", StaticFiles(directory=ROOT / "app" / "static"), name="static")
@@ -53,6 +51,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def status() -> dict[str, object]:
         return {
             "app": {"ready": True, "message": f"Dojo v{APP_VERSION} pronto."},
+            "analysis": {"ready": True, "message": "Conferência Python local pronta; não usa IA."},
+            "processing": {
+                "ready": not work_gate.busy,
+                "message": "Livre para foto ou áudio." if not work_gate.busy else "Uma leitura está em andamento.",
+            },
             "ollama": await ollama.status(),
             "whisper": whisper.status(),
         }
@@ -87,9 +90,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def photo_draft(file: UploadFile = File(...)) -> dict[str, object]:
         path = await save_upload(file, {"image/jpeg", "image/png", "image/webp"}, 10 * 1024 * 1024)
         try:
-            reading = await ollama.read_photo(path)
+            reading = await work_gate.run(
+                lambda: ollama.read_photo(path),
+                timeout_seconds=settings.photo_timeout_seconds,
+            )
             draft_id = db.create_draft("photo", reading)
             return {"draft_id": draft_id, "reading": reading, "input_type": "photo"}
+        except WorkBusyError as exc:
+            raise HTTPException(429, "Já existe uma leitura em andamento. Aguarde ou cancele a tarefa atual.") from exc
+        except WorkTimeoutError as exc:
+            raise HTTPException(504, "A leitura da foto demorou demais e foi encerrada. Tente uma foto menor.") from exc
+        except WorkCancelledError as exc:
+            raise HTTPException(409, "A leitura da foto foi cancelada.") from exc
         except LocalComponentError as exc:
             raise HTTPException(503, str(exc)) from exc
         finally:
@@ -101,27 +113,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         path = await save_upload(file, allowed, 25 * 1024 * 1024)
         work_dir = Path(tempfile.mkdtemp(prefix="dojo-audio-", dir=temp_dir))
         try:
-            reading = await run_in_threadpool(whisper.transcribe, path, work_dir)
+            reading = await work_gate.run(
+                lambda: whisper.transcribe(path, work_dir),
+                timeout_seconds=settings.audio_timeout_seconds,
+            )
             if not reading:
                 raise LocalComponentError("O áudio não produziu uma transcrição. Grave novamente.")
             draft_id = db.create_draft("audio", reading)
             return {"draft_id": draft_id, "reading": reading, "input_type": "audio"}
+        except WorkBusyError as exc:
+            raise HTTPException(429, "Já existe uma leitura em andamento. Aguarde ou cancele a tarefa atual.") from exc
+        except WorkTimeoutError as exc:
+            raise HTTPException(504, "A transcrição demorou demais e foi encerrada. Tente um áudio mais curto.") from exc
+        except WorkCancelledError as exc:
+            raise HTTPException(409, "A transcrição foi cancelada.") from exc
         except LocalComponentError as exc:
             raise HTTPException(503, str(exc)) from exc
         finally:
             path.unlink(missing_ok=True)
             shutil.rmtree(work_dir, ignore_errors=True)
 
+    @app.delete("/api/tasks/current")
+    async def cancel_current_task() -> dict[str, object]:
+        cancelled = work_gate.cancel()
+        return {
+            "cancelled": cancelled,
+            "message": "Cancelamento solicitado." if cancelled else "Não há tarefa para cancelar.",
+        }
+
     @app.post("/api/analyze")
     async def analyze(payload: Confirmation) -> dict[str, str]:
         row = db.confirm_draft(payload.draft_id, payload.corrected_text.strip())
         if row is None:
             raise HTTPException(404, "Rascunho não encontrado.")
-        try:
-            analysis = await ollama.analyze(ACTIVITY, payload.corrected_text.strip(), row["input_type"])
-        except LocalComponentError as exc:
-            raise HTTPException(503, str(exc)) from exc
-        db.save_analysis(payload.draft_id, analysis, settings.ollama_model, APP_VERSION)
+        analysis = analyze_basic_answer(payload.corrected_text.strip())
+        db.save_analysis(payload.draft_id, analysis, ANALYZER_VERSION, APP_VERSION)
         return {"analysis": analysis}
 
     return app

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 
 
 def default_data_dir() -> Path:
@@ -22,6 +22,8 @@ class Settings:
     whisper_cli: str
     whisper_model: str
     ffmpeg: str
+    photo_timeout_seconds: int = 90
+    audio_timeout_seconds: int = 240
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -32,5 +34,14 @@ class Settings:
             whisper_cli=os.getenv("WHISPER_CLI", "whisper-cli"),
             whisper_model=os.getenv("WHISPER_MODEL", ""),
             ffmpeg=os.getenv("FFMPEG", "ffmpeg"),
+            photo_timeout_seconds=_bounded_timeout("PHOTO_TIMEOUT_SECONDS", 90),
+            audio_timeout_seconds=_bounded_timeout("AUDIO_TIMEOUT_SECONDS", 240),
         )
 
+
+def _bounded_timeout(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return min(max(value, 10), 600)

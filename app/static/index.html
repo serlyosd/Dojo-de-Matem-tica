@@ -83,7 +83,7 @@
     <section id="result" class="result card" hidden>
       <div class="step-heading">
         <span class="step-number">3</span>
-        <div><h2>Leitura do assistente</h2><p>Resultado da prova técnica. Isto ainda não altera progresso pedagógico.</p></div>
+        <div><h2>Conferência local</h2><p>Feita por regras Python, sem iniciar o Ollama. Isto ainda não altera progresso pedagógico.</p></div>
       </div>
       <div id="analysis-text" class="analysis-text"></div>
       <button id="restart" class="secondary" type="button">Testar outra resposta</button>
@@ -94,11 +94,15 @@
       <div id="status-list">Verificando…</div>
     </dialog>
 
-    <div id="busy" class="busy" hidden><div class="spinner"></div><strong>Trabalhando no computador…</strong><span>Isso pode levar alguns instantes.</span></div>
+    <div id="busy" class="busy" hidden>
+      <div class="spinner"></div>
+      <strong>Trabalhando no computador…</strong>
+      <span>Somente uma leitura é executada por vez.</span>
+      <button id="cancel-task" class="secondary" type="button" hidden>Cancelar tarefa</button>
+    </div>
     <div id="toast" class="toast" role="alert" hidden></div>
   </main>
   <footer>Protótipo local independente · Tema de treinamento ninja · Nenhum dado é enviado à nuvem pelo aplicativo.</footer>
   <script src="/static/app.js"></script>
 </body>
 </html>
-

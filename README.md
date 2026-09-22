@@ -6,14 +6,25 @@ Prova técnica local de um tutor de matemática com identidade de aventura ninja
 
 - Mostra uma missão matemática curta.
 - Recebe resposta digitada, foto (`JPG`, `PNG` ou `WebP`) ou áudio do navegador.
-- Usa o Qwen3-VL no Ollama para ler a foto.
-- Usa FFmpeg e Whisper.cpp para converter e transcrever o áudio localmente.
+- Usa o Qwen3-VL no Ollama **somente** para transcrever a foto.
+- Usa FFmpeg e Whisper.cpp **somente** para converter e transcrever o áudio localmente.
+- Confere a resposta confirmada com regras Python locais, rápidas e determinísticas.
 - Sempre mostra a leitura da foto ou a transcrição em uma caixa editável.
-- Só pede a análise ao modelo depois que a pessoa confirma essa leitura.
+- Só faz a conferência local depois que a pessoa confirma essa leitura.
 - Guarda no SQLite apenas a leitura automática, a correção, a análise e as versões.
 - Apaga os arquivos temporários de foto e áudio depois do processamento.
+- Executa somente uma leitura pesada por vez, com tempo limite e botão de cancelamento.
 
 > **Limite desta entrega:** a análise exibida serve para avaliar a integração técnica. Ela não muda barra de habilidade, não atribui domínio e não constitui diagnóstico.
+
+## Proteção de desempenho
+
+- Respostas digitadas e cálculos simples não iniciam o Ollama.
+- Após a confirmação, respostas de texto, foto e áudio usam a mesma conferência Python.
+- Foto e áudio compartilham uma única vaga de processamento; uma segunda tentativa recebe uma mensagem para aguardar ou cancelar.
+- Foto tem limite padrão de 90 segundos; áudio, 240 segundos.
+- O botão **Cancelar tarefa** encerra a requisição ao Ollama ou o processo local do FFmpeg/Whisper.
+- Arquivos temporários são removidos mesmo em erro, timeout ou cancelamento.
 
 ## Primeiro uso no Windows
 
@@ -156,6 +167,8 @@ Variáveis opcionais:
 | `WHISPER_MODEL` | vazio; deve ser configurado |
 | `FFMPEG` | `ffmpeg` |
 | `DOJO_DATA_DIR` | `%LOCALAPPDATA%\DojoDaMatematica` no Windows; `data/` nos demais sistemas |
+| `PHOTO_TIMEOUT_SECONDS` | `90` |
+| `AUDIO_TIMEOUT_SECONDS` | `240` |
 
 ## Fora do escopo
 
