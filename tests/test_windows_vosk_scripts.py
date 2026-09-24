@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_download_script_validates_legacy_files_and_normalizes_nested_folder():
     script = (ROOT / "scripts" / "baixar_modelo_vosk.ps1").read_text(encoding="utf-8")
 
-    for name in ("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones", "word_boundary.int", "ivector"):
+    for name in ("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones.txt", "word_boundary.int", "ivector"):
         assert name in script
     assert "Normalize-NestedModel" in script
     assert "Move-Item -Destination $target" in script

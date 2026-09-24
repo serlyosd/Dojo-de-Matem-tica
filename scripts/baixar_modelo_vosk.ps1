@@ -10,7 +10,7 @@ $nested = Join-Path $target "vosk-model-small-pt-0.3"
 $archive = Join-Path $env:TEMP "vosk-model-small-pt-0.3.zip"
 $extract = Join-Path $env:TEMP "vosk-model-small-pt-0.3-$PID"
 $url = "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip"
-$requiredFiles = @("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones", "word_boundary.int")
+$requiredFiles = @("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones.txt", "word_boundary.int")
 
 function Test-LegacyVoskModel([string]$path) {
     if (-not (Test-Path $path -PathType Container)) { return $false }

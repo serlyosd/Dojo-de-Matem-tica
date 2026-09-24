@@ -60,4 +60,3 @@ def analyze_basic_answer(answer: str) -> str:
         question = "Quantos grupos completos de 6 você formou?"
 
     return "\n\n".join((understood, check, question))
-

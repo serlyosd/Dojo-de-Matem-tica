@@ -9,7 +9,7 @@ function Report($ok, $label, $detail) {
 
 function Test-LegacyVoskModel([string]$path) {
     if (-not (Test-Path $path -PathType Container)) { return $false }
-    foreach ($name in @("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones", "word_boundary.int")) {
+    foreach ($name in @("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones.txt", "word_boundary.int")) {
         if (-not (Test-Path (Join-Path $path $name))) { return $false }
     }
     return (Test-Path (Join-Path $path "ivector") -PathType Container)

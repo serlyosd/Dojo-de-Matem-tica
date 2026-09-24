@@ -29,3 +29,11 @@ def test_rejects_incomplete_legacy_structure(tmp_path):
 
     assert not is_legacy_portuguese_model(model)
     assert resolve_model_dir(model) is None
+
+
+def test_rejects_phones_without_txt_extension(tmp_path):
+    model = create_legacy_model(tmp_path / "vosk-model-small-pt-0.3")
+    (model / "phones.txt").rename(model / "phones")
+
+    assert not is_legacy_portuguese_model(model)
+    assert resolve_model_dir(model) is None

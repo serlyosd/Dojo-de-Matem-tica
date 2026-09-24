@@ -93,10 +93,10 @@ def test_basic_analysis_does_not_require_ollama_running(tmp_path, monkeypatch):
 
     monkeypatch.setattr(OllamaService, "status", offline_status)
     with TestClient(create_app(settings(tmp_path))) as client:
-        draft = client.post("/api/drafts/text", json={"text": "A resposta é 3."}).json()
+        draft = client.post("/api/drafts/text", json={"text": "A resposta é 3"}).json()
         result = client.post(
             "/api/analyze",
-            json={"draft_id": draft["draft_id"], "corrected_text": "A resposta é 3."},
+            json={"draft_id": draft["draft_id"], "corrected_text": "A resposta é 3"},
         )
 
     assert result.status_code == 200

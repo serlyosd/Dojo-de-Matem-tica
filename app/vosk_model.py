@@ -8,7 +8,7 @@ LEGACY_MODEL_FILES = (
     "Gr.fst",
     "HCLr.fst",
     "mfcc.conf",
-    "phones",
+    "phones.txt",
     "word_boundary.int",
 )
 
