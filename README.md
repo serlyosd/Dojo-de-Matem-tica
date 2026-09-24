@@ -55,13 +55,6 @@ Os arquivos locais ficarão organizados assim:
 Dojo-de-Matem-tica/
 ├── models/
 │   └── vosk-model-small-pt-0.3/
-│       ├── final.mdl
-│       ├── Gr.fst
-│       ├── HCLr.fst
-│       ├── mfcc.conf
-│       ├── phones
-│       ├── word_boundary.int
-│       └── ivector/
 └── tools/
     └── ffmpeg/
         └── bin/
