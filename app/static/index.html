@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dojo da Matemática — Prova técnica</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">忍</div>
+    <div>
+      <p class="eyebrow">PROVA TÉCNICA · FASE 1</p>
+      <h1>Dojo da Matemática</h1>
+    </div>
+    <button id="status-button" class="status-button" type="button">Verificar componentes</button>
+  </header>
+
+  <main>
+    <section class="hero card">
+      <div>
+        <p class="eyebrow gold">MISSÃO DO DIA</p>
+        <h2>O depósito dos veículos ninja</h2>
+        <p class="mission">A equipe ninja tem <strong>24 peças</strong>. Cada veículo precisa de <strong>6 peças</strong>. Quantos veículos completos a equipe pode montar?</p>
+      </div>
+      <div class="mentor" aria-label="Mentor da missão">
+        <div class="mentor-face" aria-hidden="true">W</div>
+        <span>Mestre do Dojo</span>
+        <small>“Mostre como você pensou.”</small>
+      </div>
+    </section>
+
+    <section class="workspace card">
+      <div class="step-heading">
+        <span class="step-number">1</span>
+        <div><h2>Escolha como responder</h2><p>Use apenas uma opção. Você poderá conferir antes da análise.</p></div>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Forma de resposta">
+        <button class="tab active" data-panel="text-panel" role="tab" aria-selected="true">⌨ Digitar</button>
+        <button class="tab" data-panel="photo-panel" role="tab" aria-selected="false">▣ Enviar foto</button>
+        <button class="tab" data-panel="audio-panel" role="tab" aria-selected="false">● Explicar por voz</button>
+      </div>
+
+      <div id="text-panel" class="input-panel active" role="tabpanel">
+        <label for="text-answer">Sua resposta</label>
+        <textarea id="text-answer" rows="5" placeholder="Digite a resposta e, se quiser, explique sua conta."></textarea>
+        <button id="send-text" class="primary" type="button">Conferir texto</button>
+      </div>
+
+      <div id="photo-panel" class="input-panel" role="tabpanel" hidden>
+        <label class="file-box" for="photo-input">
+          <strong>Escolher uma foto da conta</strong>
+          <span>JPG, PNG ou WebP · até 10 MB</span>
+        </label>
+        <input id="photo-input" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp">
+        <img id="photo-preview" class="photo-preview" alt="Prévia da foto escolhida" hidden>
+        <button id="send-photo" class="primary" type="button" disabled>Ler foto</button>
+      </div>
+
+      <div id="audio-panel" class="input-panel" role="tabpanel" hidden>
+        <div id="mic-state" class="notice">Clique abaixo para verificar a permissão do microfone.</div>
+        <div class="audio-actions">
+          <button id="check-mic" class="secondary" type="button">Verificar microfone</button>
+          <button id="record" class="record" type="button" disabled>● Começar gravação</button>
+        </div>
+        <audio id="audio-preview" controls hidden></audio>
+        <button id="send-audio" class="primary" type="button" disabled>Transcrever áudio</button>
+      </div>
+    </section>
+
+    <section id="confirmation" class="confirmation card" hidden>
+      <div class="step-heading">
+        <span class="step-number">2</span>
+        <div><h2>Confira a leitura</h2><p>Corrija qualquer número, palavra ou sinal antes de continuar.</p></div>
+      </div>
+      <div class="warning"><strong>Atenção:</strong> o aplicativo só analisará o texto depois da sua confirmação.</div>
+      <label for="confirmed-reading">Leitura que será analisada</label>
+      <textarea id="confirmed-reading" rows="6"></textarea>
+      <button id="confirm-analysis" class="primary" type="button">Confirmar e analisar</button>
+    </section>
+
+    <section id="result" class="result card" hidden>
+      <div class="step-heading">
+        <span class="step-number">3</span>
+        <div><h2>Conferência local</h2><p>Feita por regras Python, sem iniciar o Ollama. Isto ainda não altera progresso pedagógico.</p></div>
+      </div>
+      <div id="analysis-text" class="analysis-text"></div>
+      <button id="restart" class="secondary" type="button">Testar outra resposta</button>
+    </section>
+
+    <dialog id="status-dialog">
+      <div class="dialog-title"><h2>Componentes locais</h2><button id="close-status" aria-label="Fechar">×</button></div>
+      <div id="status-list">Verificando…</div>
+    </dialog>
+
+    <div id="busy" class="busy" hidden>
+      <div class="spinner"></div>
+      <strong>Trabalhando no computador…</strong>
+      <span>Somente uma leitura é executada por vez.</span>
+      <button id="cancel-task" class="secondary" type="button" hidden>Cancelar tarefa</button>
+    </div>
+    <div id="toast" class="toast" role="alert" hidden></div>
+  </main>
+  <footer>Protótipo local independente · Tema de treinamento ninja · Nenhum dado é enviado à nuvem pelo aplicativo.</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
