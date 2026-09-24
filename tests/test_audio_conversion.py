@@ -6,6 +6,7 @@ import pytest
 
 from app.config import Settings
 from app.services import LocalComponentError, VoskService
+from app.vosk_model import LEGACY_MODEL_FILES
 
 
 def write_wav(path: Path, seconds: float = 0.1) -> None:
@@ -52,8 +53,10 @@ class HangingProcess(FakeProcess):
 def make_service(tmp_path, max_audio_seconds=60):
     ffmpeg = tmp_path / "ffmpeg.exe"
     model = tmp_path / "vosk-model-small-pt-0.3"
-    (model / "conf").mkdir(parents=True)
-    (model / "conf" / "model.conf").write_text("--sample-frequency=16000", encoding="utf-8")
+    model.mkdir(parents=True)
+    for name in LEGACY_MODEL_FILES:
+        (model / name).write_bytes(b"modelo")
+    (model / "ivector").mkdir()
     ffmpeg.write_bytes(b"ficticio")
     return VoskService(
         Settings(
@@ -165,3 +168,20 @@ def test_status_explains_missing_vosk_and_ffmpeg(tmp_path, monkeypatch):
     assert "biblioteca Python Vosk" in status["message"]
     assert "modelo português pequeno do Vosk" in status["message"]
     assert "FFmpeg" in status["message"]
+
+
+def test_service_accepts_duplicated_legacy_model_folder(tmp_path, monkeypatch):
+    ffmpeg = tmp_path / "ffmpeg.exe"
+    ffmpeg.write_bytes(b"ficticio")
+    configured = tmp_path / "vosk-model-small-pt-0.3"
+    nested = configured / "vosk-model-small-pt-0.3"
+    nested.mkdir(parents=True)
+    for name in LEGACY_MODEL_FILES:
+        (nested / name).write_bytes(b"modelo")
+    (nested / "ivector").mkdir()
+    service = VoskService(Settings(tmp_path, "url", "model", str(configured), str(ffmpeg)))
+    monkeypatch.setattr("app.services.importlib.util.find_spec", lambda name: object())
+
+    status = service.status()
+
+    assert status == {"ready": True, "message": "Vosk português pequeno e FFmpeg prontos."}

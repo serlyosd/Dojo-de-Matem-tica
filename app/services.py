@@ -10,6 +10,7 @@ import wave
 from pathlib import Path
 
 from .config import Settings
+from .vosk_model import resolve_model_dir
 
 
 class LocalComponentError(RuntimeError):
@@ -85,12 +86,12 @@ class VoskService:
         return shutil.which(value)
 
     def status(self) -> dict[str, object]:
-        model = Path(self.settings.vosk_model_dir) if self.settings.vosk_model_dir else None
+        model = resolve_model_dir(self.settings.vosk_model_dir) if self.settings.vosk_model_dir else None
         ffmpeg = self._program(self.settings.ffmpeg)
         missing = []
         if importlib.util.find_spec("vosk") is None:
             missing.append("biblioteca Python Vosk")
-        if not model or not model.is_dir() or not (model / "conf" / "model.conf").is_file():
+        if model is None:
             missing.append("modelo português pequeno do Vosk")
         if not ffmpeg:
             missing.append("FFmpeg")
@@ -135,6 +136,9 @@ class VoskService:
         status = self.status()
         if not status["ready"]:
             raise LocalComponentError(str(status["message"]))
+        model_dir = resolve_model_dir(self.settings.vosk_model_dir)
+        if model_dir is None:
+            raise LocalComponentError("A estrutura do modelo português pequeno do Vosk é inválida.")
         work_dir.mkdir(parents=True, exist_ok=True)
         wav_path = work_dir / f"{source.stem}.wav"
         await self._run(
@@ -154,7 +158,7 @@ class VoskService:
         stdout = await self._run(
             [
                 sys.executable, "-m", "app.vosk_worker",
-                "--model", self.settings.vosk_model_dir,
+                "--model", str(model_dir),
                 "--audio", str(wav_path),
             ],
             timeout=self.settings.audio_timeout_seconds,

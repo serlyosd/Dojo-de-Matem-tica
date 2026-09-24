@@ -7,6 +7,21 @@ function Report($ok, $label, $detail) {
     else { Write-Host "[FALTA]  $label - $detail" -ForegroundColor Yellow; $script:failed = $true }
 }
 
+function Test-LegacyVoskModel([string]$path) {
+    if (-not (Test-Path $path -PathType Container)) { return $false }
+    foreach ($name in @("final.mdl", "Gr.fst", "HCLr.fst", "mfcc.conf", "phones", "word_boundary.int")) {
+        if (-not (Test-Path (Join-Path $path $name))) { return $false }
+    }
+    return (Test-Path (Join-Path $path "ivector") -PathType Container)
+}
+
+function Resolve-VoskModel([string]$path) {
+    if (Test-LegacyVoskModel $path) { return $path }
+    $nested = Join-Path $path (Split-Path $path -Leaf)
+    if (Test-LegacyVoskModel $nested) { return $nested }
+    return $null
+}
+
 Write-Host "`nDojo da Matematica - verificacao da fase 1`n" -ForegroundColor Cyan
 $python = Get-Command py
 Report ($null -ne $python) "Python" "comando py"
@@ -36,7 +51,8 @@ try {
     if (-not $nextAction) { $nextAction = "Abra o Ollama." }
 }
 
-$voskModelReady = Test-Path (Join-Path $env:VOSK_MODEL_DIR "conf\model.conf") -PathType Leaf
+$resolvedVoskModel = Resolve-VoskModel $env:VOSK_MODEL_DIR
+$voskModelReady = $null -ne $resolvedVoskModel
 $ffmpegReady = Test-Path $env:FFMPEG -PathType Leaf
 Report $voskModelReady "Modelo Vosk portugues pequeno" $env:VOSK_MODEL_DIR
 Report $ffmpegReady "FFmpeg" $env:FFMPEG
@@ -45,6 +61,7 @@ if (-not $ffmpegReady -and -not $nextAction) { $nextAction = "Coloque ffmpeg.exe
 
 $voskRuntimeReady = $false
 if ($dependenciesReady -and $voskModelReady) {
+    $env:VOSK_MODEL_DIR = $resolvedVoskModel
     & $appPython -c "import os; from vosk import Model,SetLogLevel; SetLogLevel(-1); Model(os.environ['VOSK_MODEL_DIR'])" 2>$null
     $voskRuntimeReady = $LASTEXITCODE -eq 0
 }

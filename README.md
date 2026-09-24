@@ -64,6 +64,7 @@ Dojo-de-Matem-tica/
 Se usar outros locais ou nomes, edite somente `scripts\configurar_dojo.bat`.
 
 Os caminhos acima já estão configurados nesse arquivo. Não é preciso alterá-lo quando as pastas forem mantidas como no exemplo.
+Essa é a estrutura legada oficial do modelo português. Se a extração criar uma pasta duplicada com o mesmo nome dentro dela, os scripts a normalizam automaticamente. Um modelo válido já existente não é baixado novamente.
 
 ### 2. Prepare o aplicativo
 

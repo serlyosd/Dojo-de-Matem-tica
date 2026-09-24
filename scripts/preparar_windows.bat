@@ -16,6 +16,7 @@ if errorlevel 1 goto :erro
 if errorlevel 1 goto :erro
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 goto :erro
+echo [Dojo] Validando o modelo Vosk oficial...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0baixar_modelo_vosk.ps1"
 if errorlevel 1 goto :erro
 echo.
