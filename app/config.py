@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.1.3"
 
 
 def default_data_dir() -> Path:

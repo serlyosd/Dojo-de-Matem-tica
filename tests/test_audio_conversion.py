@@ -91,7 +91,7 @@ def test_audio_conversion_uses_one_thread_and_vosk_worker(tmp_path, monkeypatch)
     assert calls[0][calls[0].index("-threads") + 1] == "1"
     assert calls[0][calls[0].index("-ar") + 1] == "16000"
     assert calls[0][calls[0].index("-ac") + 1] == "1"
-    assert calls[1][1:3] == ["-m", "app.vosk_worker"]
+    assert Path(calls[1][1]).name == "vosk_worker.py"
     assert "vosk-model-small-pt-0.3" in calls[1][calls[1].index("--model") + 1]
 
 
@@ -132,7 +132,7 @@ def test_cancellation_kills_local_process(tmp_path, monkeypatch):
     monkeypatch.setattr("app.services.asyncio.create_subprocess_exec", fake_subprocess)
 
     async def scenario():
-        task = asyncio.create_task(service._run(["programa"], 30, "falhou"))
+        task = asyncio.create_task(service._run(["programa"], 30, "falhou", "teste"))
         await asyncio.sleep(0)
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -154,7 +154,7 @@ def test_timeout_kills_local_process(tmp_path, monkeypatch):
     monkeypatch.setattr("app.services.asyncio.create_subprocess_exec", fake_subprocess)
 
     with pytest.raises(LocalComponentError, match="Tempo limite atingido"):
-        asyncio.run(service._run(["programa"], 0.01, "falhou"))
+        asyncio.run(service._run(["programa"], 0.01, "falhou", "teste"))
     assert processes[0].killed
 
 
@@ -185,3 +185,22 @@ def test_service_accepts_duplicated_legacy_model_folder(tmp_path, monkeypatch):
     status = service.status()
 
     assert status == {"ready": True, "message": "Vosk português pequeno e FFmpeg prontos."}
+
+
+def test_process_error_exposes_stderr_and_stage(tmp_path, monkeypatch, caplog):
+    service = make_service(tmp_path)
+    process = FakeProcess(["ffmpeg"], [])
+    process.returncode = 1
+
+    async def failed_communicate():
+        return b"", "codec WebM não suportado".encode()
+
+    process.communicate = failed_communicate
+    monkeypatch.setattr(
+        "app.services.asyncio.create_subprocess_exec", lambda *args, **kwargs: asyncio.sleep(0, result=process)
+    )
+
+    with pytest.raises(LocalComponentError, match="codec WebM não suportado"):
+        asyncio.run(service._run(["ffmpeg"], 10, "Falha de conversão.", "FFmpeg"))
+    assert "Etapa FFmpeg" in caplog.text
+    assert "stderr=codec WebM não suportado" in caplog.text

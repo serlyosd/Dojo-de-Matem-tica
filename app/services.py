@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import importlib.util
+import logging
 import os
 import shutil
 import sys
@@ -11,6 +12,13 @@ from pathlib import Path
 
 from .config import Settings
 from .vosk_model import resolve_model_dir
+
+
+logger = logging.getLogger("dojo.services")
+
+
+def _tail(data: bytes, limit: int = 1200) -> str:
+    return data.decode("utf-8", errors="replace").strip()[-limit:]
 
 
 class LocalComponentError(RuntimeError):
@@ -28,6 +36,8 @@ class OllamaService:
             "model": self.settings.ollama_model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": 0,
+            "options": {"num_thread": 1},
         }
         payload["images"] = images
         try:
@@ -35,15 +45,23 @@ class OllamaService:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(f"{self.settings.ollama_url}/api/generate", json=payload)
                 response.raise_for_status()
-        except (httpx.HTTPError, httpx.TimeoutException) as exc:
-            raise LocalComponentError(
-                "Não consegui conversar com o Ollama. Abra o Ollama e confira o modelo configurado."
-            ) from exc
+        except httpx.TimeoutException as exc:
+            logger.exception("Ollama timeout url=%s model=%s", self.settings.ollama_url, self.settings.ollama_model)
+            raise LocalComponentError("O Ollama excedeu o tempo limite ao ler a foto.") from exc
+        except httpx.HTTPStatusError as exc:
+            body = exc.response.text[-1200:]
+            logger.exception("Ollama HTTP %s: %s", exc.response.status_code, body)
+            raise LocalComponentError(f"O Ollama respondeu HTTP {exc.response.status_code}: {body}") from exc
+        except httpx.HTTPError as exc:
+            logger.exception("Falha de conexão com Ollama em %s", self.settings.ollama_url)
+            raise LocalComponentError("Não foi possível conectar ao Ollama local.") from exc
         try:
             answer = response.json().get("response", "").strip()
         except (ValueError, AttributeError) as exc:
+            logger.exception("Ollama devolveu JSON inválido: %s", response.text[-1200:])
             raise LocalComponentError("O Ollama devolveu uma resposta inválida. Tente novamente.") from exc
         if not answer:
+            logger.error("Ollama respondeu sem transcrição: %s", response.text[-1200:])
             raise LocalComponentError("O Ollama respondeu sem texto. Tente novamente.")
         return answer
 
@@ -99,10 +117,11 @@ class VoskService:
             return {"ready": False, "message": "Falta: " + ", ".join(missing) + "."}
         return {"ready": True, "message": "Vosk português pequeno e FFmpeg prontos."}
 
-    async def _run(self, command: list[str], timeout: int, failure_message: str) -> bytes:
+    async def _run(self, command: list[str], timeout: int, failure_message: str, stage: str) -> bytes:
         environment = os.environ.copy()
         environment.update({"OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"})
         try:
+            logger.info("Etapa %s: executando %r", stage, command)
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
@@ -110,19 +129,26 @@ class VoskService:
                 env=environment,
             )
         except OSError as exc:
-            raise LocalComponentError(failure_message) from exc
+            logger.exception("Etapa %s: não iniciou comando=%r", stage, command)
+            raise LocalComponentError(f"{failure_message} Não foi possível iniciar o comando: {exc}") from exc
         try:
-            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
         except TimeoutError as exc:
             process.kill()
-            await process.communicate()
+            _, stderr = await process.communicate()
+            logger.error("Etapa %s: timeout; stderr=%s", stage, _tail(stderr))
             raise LocalComponentError(f"{failure_message} Tempo limite atingido.") from exc
         except asyncio.CancelledError:
             process.kill()
-            await process.communicate()
+            _, stderr = await process.communicate()
+            logger.warning("Etapa %s: cancelada; stderr=%s", stage, _tail(stderr))
             raise
         if process.returncode != 0:
-            raise LocalComponentError(failure_message)
+            stderr_text = _tail(stderr)
+            logger.error("Etapa %s: retorno=%s comando=%r stderr=%s", stage, process.returncode, command, stderr_text)
+            detail = f" Detalhe: {stderr_text}" if stderr_text else ""
+            raise LocalComponentError(f"{failure_message}{detail}")
+        logger.info("Etapa %s concluída", stage)
         return stdout
 
     def _duration(self, wav_path: Path) -> float:
@@ -149,6 +175,7 @@ class VoskService:
             ],
             timeout=min(60, self.settings.audio_timeout_seconds),
             failure_message="Não consegui converter o áudio. Confira o FFmpeg e o formato gravado.",
+            stage="FFmpeg",
         )
         if self._duration(wav_path) > self.settings.max_audio_seconds:
             raise LocalComponentError(
@@ -157,7 +184,7 @@ class VoskService:
 
         stdout = await self._run(
             [
-                sys.executable, "-m", "app.vosk_worker",
+                sys.executable, str(Path(__file__).with_name("vosk_worker.py")),
                 "--model", str(model_dir),
                 "--audio", str(wav_path),
             ],
@@ -165,6 +192,7 @@ class VoskService:
             failure_message=(
                 "O Vosk não conseguiu transcrever. Confira o modelo português e a compatibilidade do processador."
             ),
+            stage="Vosk",
         )
         try:
             return stdout.decode("utf-8").strip()

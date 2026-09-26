@@ -100,4 +100,21 @@ def test_basic_analysis_does_not_require_ollama_running(tmp_path, monkeypatch):
         )
 
     assert result.status_code == 200
-    assert "ainda não corresponde a 4 veículos" in result.json()["analysis"]
+    assert "Tipo de erro" in result.json()["analysis"]
+
+
+def test_three_wrong_answers_finish_mission_without_infinite_loop(tmp_path):
+    with TestClient(create_app(settings(tmp_path))) as client:
+        responses = []
+        for _ in range(3):
+            draft = client.post("/api/drafts/text", json={"text": "3"}).json()
+            responses.append(client.post(
+                "/api/analyze",
+                json={"draft_id": draft["draft_id"], "corrected_text": "3", "mission_id": "mission-errors"},
+            ).json())
+
+    assert [item["wrong_attempts"] for item in responses] == [1, 2, 3]
+    assert "Tipo de erro" in responses[0]["analysis"]
+    assert "Dica:" in responses[1]["analysis"]
+    assert "Resolução:" in responses[2]["analysis"]
+    assert responses[2]["finished"] is True

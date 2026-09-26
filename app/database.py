@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS analyses (
     app_version TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS mission_attempts (
+    mission_id TEXT PRIMARY KEY,
+    wrong_attempts INTEGER NOT NULL DEFAULT 0,
+    completed INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -63,3 +70,23 @@ class Database:
                 (draft_id, text, model, version),
             )
 
+    def register_mission_result(self, mission_id: str, correct: bool) -> int:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO mission_attempts (mission_id) VALUES (?)", (mission_id,)
+            )
+            if correct:
+                connection.execute(
+                    "UPDATE mission_attempts SET completed = 1, updated_at = CURRENT_TIMESTAMP WHERE mission_id = ?",
+                    (mission_id,),
+                )
+            else:
+                connection.execute(
+                    "UPDATE mission_attempts SET wrong_attempts = MIN(wrong_attempts + 1, 3), "
+                    "updated_at = CURRENT_TIMESTAMP WHERE mission_id = ?",
+                    (mission_id,),
+                )
+            row = connection.execute(
+                "SELECT wrong_attempts FROM mission_attempts WHERE mission_id = ?", (mission_id,)
+            ).fetchone()
+            return int(row["wrong_attempts"])

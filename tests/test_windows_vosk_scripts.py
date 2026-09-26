@@ -22,3 +22,12 @@ def test_windows_verifier_normalizes_before_runtime_check():
     assert "-SomenteNormalizar" in batch
     assert "Resolve-VoskModel" in verifier
     assert "Model(os.environ['VOSK_MODEL_DIR'])" in verifier
+
+
+def test_verifier_distinguishes_installation_from_functional_diagnostic():
+    verifier = (ROOT / "scripts" / "verificar_windows.ps1").read_text(encoding="utf-8")
+    diagnostic = (ROOT / "scripts" / "diagnosticar_windows.bat").read_text(encoding="utf-8")
+
+    assert "Isto nao comprova o fluxo completo" in verifier
+    assert "diagnosticar_windows.bat" in verifier
+    assert "diagnosticar_fluxos.py" in diagnostic

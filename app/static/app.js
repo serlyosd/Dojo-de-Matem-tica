@@ -3,6 +3,7 @@ let currentDraft = null;
 let audioBlob = null;
 let mediaRecorder = null;
 let mediaStream = null;
+let missionId = crypto.randomUUID ? crypto.randomUUID() : `mission-${Date.now()}`;
 
 function busy(active, cancellable = false) {
   $("#busy").hidden = !active;
@@ -161,10 +162,13 @@ $("#confirm-analysis").addEventListener("click", async () => {
   try {
     const data = await request("/api/analyze", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draft_id: currentDraft, corrected_text: correctedText })
+      body: JSON.stringify({ draft_id: currentDraft, corrected_text: correctedText, mission_id: missionId })
     });
     $("#analysis-text").textContent = data.analysis;
     $("#result").hidden = false;
+    $("#restart").hidden = data.finished;
+    $("#new-mission").hidden = !data.finished;
+    $("#end-mission").hidden = !data.finished;
     $("#result").scrollIntoView({ behavior: "smooth" });
   } catch (reason) { error(reason.message); }
 });
@@ -172,6 +176,21 @@ $("#confirm-analysis").addEventListener("click", async () => {
 $("#restart").addEventListener("click", () => {
   currentDraft = null; $("#confirmation").hidden = true; $("#result").hidden = true;
   window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+$("#new-mission").addEventListener("click", () => {
+  missionId = crypto.randomUUID ? crypto.randomUUID() : `mission-${Date.now()}`;
+  currentDraft = null;
+  $("#text-answer").value = "";
+  $("#confirmation").hidden = true;
+  $("#result").hidden = true;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+$("#end-mission").addEventListener("click", () => {
+  $("#confirmation").hidden = true;
+  $("#result").hidden = true;
+  error("Missão encerrada. Você pode fechar o aplicativo.");
 });
 
 $("#status-button").addEventListener("click", async () => {

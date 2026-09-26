@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import shutil
 import tempfile
 from pathlib import Path
@@ -10,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .analysis import ANALYZER_VERSION, analyze_basic_answer
+from .analysis import ANALYZER_VERSION, analyze_basic_answer, evaluate_basic_answer
 from .config import APP_VERSION, Settings
 from .database import Database
 from .services import LocalComponentError, OllamaService, VoskService
@@ -18,6 +19,13 @@ from .work_gate import WorkBusyError, WorkCancelledError, WorkGate, WorkTimeoutE
 
 
 ROOT = Path(__file__).resolve().parents[1]
+logger = logging.getLogger("dojo")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s — %(message)s"))
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
 class TextDraft(BaseModel):
@@ -27,6 +35,7 @@ class TextDraft(BaseModel):
 class Confirmation(BaseModel):
     draft_id: int
     corrected_text: str = Field(min_length=1, max_length=4000)
+    mission_id: str = Field(default="mission-default", min_length=1, max_length=100)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -103,7 +112,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except WorkCancelledError as exc:
             raise HTTPException(409, "A leitura da foto foi cancelada.") from exc
         except LocalComponentError as exc:
-            raise HTTPException(503, str(exc)) from exc
+            logger.exception("Falha no fluxo de foto: %s", exc)
+            raise HTTPException(503, f"Foto — {exc}") from exc
         finally:
             path.unlink(missing_ok=True)
 
@@ -128,7 +138,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except WorkCancelledError as exc:
             raise HTTPException(409, "A transcrição foi cancelada.") from exc
         except LocalComponentError as exc:
-            raise HTTPException(503, str(exc)) from exc
+            logger.exception("Falha no fluxo de áudio: %s", exc)
+            raise HTTPException(503, f"Áudio — {exc}") from exc
         finally:
             path.unlink(missing_ok=True)
             shutil.rmtree(work_dir, ignore_errors=True)
@@ -142,13 +153,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     @app.post("/api/analyze")
-    async def analyze(payload: Confirmation) -> dict[str, str]:
+    async def analyze(payload: Confirmation) -> dict[str, object]:
         row = db.confirm_draft(payload.draft_id, payload.corrected_text.strip())
         if row is None:
             raise HTTPException(404, "Rascunho não encontrado.")
-        analysis = analyze_basic_answer(payload.corrected_text.strip())
+        evaluation = evaluate_basic_answer(payload.corrected_text.strip())
+        attempt = db.register_mission_result(payload.mission_id, evaluation.correct)
+        analysis = analyze_basic_answer(payload.corrected_text.strip(), attempt or 1)
         db.save_analysis(payload.draft_id, analysis, ANALYZER_VERSION, APP_VERSION)
-        return {"analysis": analysis}
+        return {
+            "analysis": analysis,
+            "correct": evaluation.correct,
+            "wrong_attempts": attempt,
+            "finished": evaluation.correct or attempt >= 3,
+        }
 
     return app
 

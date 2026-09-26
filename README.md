@@ -106,6 +106,22 @@ O navegador deverá abrir em `http://127.0.0.1:8000`.
 
 Para encerrar, feche a janela preta ou pressione `Ctrl+C` nela.
 
+### Diagnóstico funcional
+
+Com o aplicativo aberto, arraste um arquivo de áudio local sobre:
+
+```text
+scripts\diagnosticar_windows.bat
+```
+
+Esse diagnóstico usa o mesmo endpoint do navegador e percorre upload, FFmpeg, WAV mono de 16 kHz, worker Vosk e resposta da API. Para testar também uma foto, execute `python scripts\diagnosticar_fluxos.py --audio arquivo.wav --foto conta.png`. O terminal registra a etapa, o comando, timeout, exceção, código HTTP e `stderr` dos processos locais.
+
+O verificador informa se os componentes estão instalados. O diagnóstico funcional comprova se eles trabalham juntos.
+
+Para os testes opcionais ao vivo, inicie o aplicativo e defina `DOJO_LIVE_AUDIO` ou `DOJO_LIVE_PHOTO` com um arquivo fictício local antes de executar `python -m pytest tests/test_live_flows.py -q`.
+
+Em caso de falha, consulte a janela do servidor. Ela mostra a etapa (`FFmpeg`, `Vosk` ou `Ollama`), o comando executado, timeout, código HTTP, exceção e o final do `stderr`. Não use mídia pessoal no diagnóstico.
+
 ## Teste real no computador
 
 Faça nesta ordem:

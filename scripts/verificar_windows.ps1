@@ -79,4 +79,6 @@ if ($failed) {
     & "$PSScriptRoot\acao_necessaria.ps1" -Mensagem $nextAction
     exit 1
 }
+Write-Host "`n[INSTALADO] Componentes encontrados. Isto nao comprova o fluxo completo." -ForegroundColor Green
+Write-Host "[PROXIMO] Execute scripts\diagnosticar_windows.bat com um audio ficticio." -ForegroundColor Cyan
 exit 0
