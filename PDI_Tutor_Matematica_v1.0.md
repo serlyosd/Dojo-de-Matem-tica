@@ -207,9 +207,9 @@ Fotos e áudios ficam no computador. **Proposta a validar:** apagá-los após co
 | --- | --- |
 | Interface | Aplicativo local; pode abrir pelo navegador, com uma tela simples para a aluna |
 | Serviço local | Coordena atividades, verificação matemática, regras de progresso e persistência |
-| IA de texto e imagem | Qwen3-VL 4B como candidato inicial aprovado, sujeito ao teste de qualidade |
+| IA para leitura de foto | Qwen3-VL 4B como candidato inicial; não usar para texto digitado nem cálculos simples |
 | Execução da IA | Ollama instalado no computador |
-| Voz para texto | Whisper.cpp com modelo multilíngue local |
+| Voz para texto | Vosk offline com modelo português pequeno, adequado ao computador sem AVX e com 4 GB de RAM |
 | Banco de dados | SQLite em diretório permanente de dados, separado da instalação |
 | Arquivos | Pastas locais para mídia e backups, fora do repositório |
 | Desenvolvimento | Codex, com código e versões no GitHub |
@@ -218,7 +218,7 @@ O Qwen3-VL recebe texto e imagens e tem licença Apache 2.0. A adequação à le
 
 O aplicativo se conectará ao servidor local do Ollama, normalmente em `http://localhost:11434/api`. Chamadas locais não exigem chave. O conector será implementado pelo Codex no aplicativo; o usuário não precisa entregar uma integração pronta. [API oficial do Ollama](https://docs.ollama.com/api/introduction).
 
-O Whisper.cpp executa transcrição local e permite integração com aplicações. Selecionar a versão multilíngue do modelo, não uma variante somente em inglês. [Projeto oficial](https://github.com/ggml-org/whisper.cpp).
+O Vosk executa transcrição local e offline. A fase 1 usa o modelo português pequeno `vosk-model-small-pt-0.3`, com áudio curto, uma tarefa por vez e processo isolado para limitar o consumo no computador disponível. [Projeto oficial](https://alphacephei.com/vosk/).
 
 O fluxo do áudio será gravação → transcrição → confirmação quando necessária → análise pedagógica junto à resposta e à foto. Não é necessário um modelo que interprete áudio diretamente.
 
